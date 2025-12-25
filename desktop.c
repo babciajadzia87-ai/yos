@@ -92,4 +92,3 @@ int main() {
     close(mouse_fd);
     return 0;
 }
-d
