@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <termios.h>
 
 /* START BUTTON */
 typedef struct {
@@ -15,6 +16,14 @@ typedef struct {
 } Button;
 
 int main() {
+    /* --- Zapisz stare ustawienia terminala i wyłącz echo/canonical --- */
+    struct termios oldt, newt;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    /* --- Framebuffer --- */
     int fb = open("/dev/fb0", O_RDWR);
     if(fb < 0){ perror("fb open"); return 1; }
 
@@ -56,16 +65,16 @@ int main() {
         }
     }
 
-    /* ---- Event loop (mysz) ---- */
+    /* ---- Event loop myszy ---- */
     int mouse_fd = open("/dev/input/mice", O_RDONLY);
     if(mouse_fd < 0){ perror("mice"); return 1; }
 
     unsigned char data[3];
+    int mx=0, my=0;
     while(1){
         read(mouse_fd, data, 3);
         int dx = (signed char)data[1];
         int dy = -(signed char)data[2]; // y-axis flipped
-        static int mx=0,my=0;
         mx += dx; if(mx<0)mx=0; if(mx>=width)mx=width-1;
         my += dy; if(my<0)my=0; if(my>=height)my=height-1;
 
@@ -87,8 +96,13 @@ int main() {
         }else start.pressed=0;
     }
 
+    /* --- Cleanup --- */
     munmap(fbp,screensize);
     close(fb);
     close(mouse_fd);
+
+    /* Przywróć ustawienia terminala */
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
     return 0;
 }
